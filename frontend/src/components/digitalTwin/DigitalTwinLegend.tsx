@@ -15,6 +15,8 @@ const connectionLegend = [
   ["Flowline de injeção de gás", "#a78bfa"],
   ["Riser", "#22d3ee"],
   ["Umbilical", "#facc15"],
+  ["Trajetória de poço", "#e2e8f0"],
+  ["Reservatório", "#f97316"],
   ["Corrente", "#38bdf8"],
 ];
 
@@ -45,4 +47,3 @@ export function DigitalTwinLegend() {
     </section>
   );
 }
-

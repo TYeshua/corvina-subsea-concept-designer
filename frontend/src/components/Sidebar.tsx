@@ -80,7 +80,7 @@ export function Sidebar() {
         <div className="mt-auto rounded-lg border border-emerald-500/20 bg-emerald-500/10 p-4">
           <p className="text-sm font-medium text-emerald-200">Backend FastAPI</p>
           <p className="mt-1 break-all text-xs text-emerald-100/70">
-            http://localhost:8000
+            http://127.0.0.1:8000
           </p>
         </div>
       </aside>

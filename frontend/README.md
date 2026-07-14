@@ -1,14 +1,15 @@
 # Corvina Subsea Concept Designer - Frontend
 
-Frontend em React, Vite, TypeScript e TailwindCSS para o Corvina Subsea Concept Designer.
+Frontend em React, Vite, TypeScript e TailwindCSS para o Corvina Subsea Concept
+Designer.
 
 ## Requisitos
 
 - Node.js
 - npm
-- Backend FastAPI rodando em `http://localhost:8000`
+- Backend FastAPI rodando em `http://127.0.0.1:8000`
 
-## Como executar
+## Como Executar
 
 ```bash
 cd frontend
@@ -22,12 +23,6 @@ O frontend ficará disponível em:
 http://localhost:5173
 ```
 
-O backend precisa estar rodando em:
-
-```text
-http://localhost:8000
-```
-
 ## Scripts
 
 ```bash
@@ -36,7 +31,7 @@ npm run build
 npm run preview
 ```
 
-## Rotas disponíveis
+## Rotas
 
 ```text
 /
@@ -50,21 +45,26 @@ npm run preview
 /demo
 ```
 
-## Recursos implementados
+## Recursos Implementados
 
 - Dashboard com cards, gráficos e leitura executiva.
 - Dados do Campo com premissas técnicas.
-- Cálculos com indicadores, status e equações demonstradas.
-- Arquitetura submarina com recomendações por grupo técnico.
-- Layout 2D em SVG interativo, com seleção, camadas, tela cheia e exportação SVG.
-- Gêmeo Digital 3D com React Three Fiber, camadas, painel de detalhes, tela cheia e captura de imagem.
-- Relatório técnico com cópia de textos e exportação de resumo.
+- Cálculos com fórmula, substituição de valores, resultado e interpretação para
+  cada indicador.
+- Arquitetura submarina com inventário detalhado de equipamentos.
+- Layout 2D em SVG interativo, com seleção, camadas, modos de visualização,
+  estimativas de distância, tela cheia e exportação SVG.
+- Gêmeo Digital 3D com React Three Fiber, camadas, plano do reservatório,
+  trajetórias de poços, modos de câmera, painel de profundidades, tela cheia e
+  captura de imagem.
+- Relatório técnico com cópia de textos, resumo JSON e exportação PDF pelo
+  backend.
 - Roteiro de demonstração para apresentação.
 
-## API consumida
+## API Consumida
 
 O arquivo `src/api/client.ts` aponta para:
 
 ```text
-http://localhost:8000
+http://127.0.0.1:8000
 ```

@@ -1,4 +1,5 @@
 import { Camera, Maximize2, Minimize2, RotateCcw } from "lucide-react";
+import type { DigitalTwinViewMode } from "../../utils/digitalTwinCamera";
 
 export interface DigitalTwinLayerState {
   production: boolean;
@@ -7,6 +8,8 @@ export interface DigitalTwinLayerState {
   risers: boolean;
   umbilicals: boolean;
   sdus: boolean;
+  reservoir: boolean;
+  wellbores: boolean;
   labels: boolean;
   seaSurface: boolean;
   seabed: boolean;
@@ -15,7 +18,9 @@ export interface DigitalTwinLayerState {
 
 interface DigitalTwinControlsProps {
   layers: DigitalTwinLayerState;
+  viewMode: DigitalTwinViewMode;
   onToggle: (key: keyof DigitalTwinLayerState) => void;
+  onViewModeChange: (mode: DigitalTwinViewMode) => void;
   onReset: () => void;
   onCapture: () => void;
   onToggleFullscreen: () => void;
@@ -30,15 +35,32 @@ const layerControls: Array<{ key: keyof DigitalTwinLayerState; label: string }> 
   { key: "risers", label: "Risers" },
   { key: "umbilicals", label: "Umbilicais" },
   { key: "sdus", label: "SDUs" },
+  { key: "reservoir", label: "Reservatório" },
+  { key: "wellbores", label: "Poços até reservatório" },
   { key: "labels", label: "Labels" },
   { key: "seaSurface", label: "Superfície" },
   { key: "seabed", label: "Leito marinho" },
   { key: "current", label: "Corrente" },
 ];
 
+const viewModeControls: Array<{ value: DigitalTwinViewMode; label: string }> = [
+  { value: "overview", label: "Geral" },
+  { value: "production", label: "Produção" },
+  { value: "waterInjection", label: "Água" },
+  { value: "gasInjection", label: "Gás" },
+  { value: "risers", label: "Risers" },
+  { value: "umbilicals", label: "Umbilicais" },
+  { value: "wellbores", label: "Poços" },
+  { value: "reservoir", label: "Reservatório" },
+  { value: "top", label: "Topo" },
+  { value: "verticalSection", label: "Seção" },
+];
+
 export function DigitalTwinControls({
   layers,
+  viewMode,
   onToggle,
+  onViewModeChange,
   onReset,
   onCapture,
   onToggleFullscreen,
@@ -71,6 +93,29 @@ export function DigitalTwinControls({
         )}
         {isFullscreen ? "Sair da tela cheia" : "Visualizar em tela cheia"}
       </button>
+
+      <div className="mt-4">
+        <p className="text-xs font-semibold uppercase text-slate-500">
+          Modo de câmera
+        </p>
+        <div className="mt-2 grid grid-cols-2 gap-2">
+          {viewModeControls.map((mode) => (
+            <button
+              key={mode.value}
+              type="button"
+              onClick={() => onViewModeChange(mode.value)}
+              className={[
+                "min-h-9 rounded-lg border px-2 text-xs font-semibold transition",
+                viewMode === mode.value
+                  ? "border-cyan-300 bg-cyan-400 text-slate-950"
+                  : "border-slate-800 bg-slate-950/50 text-slate-300 hover:border-cyan-500/35 hover:text-cyan-100",
+              ].join(" ")}
+            >
+              {mode.label}
+            </button>
+          ))}
+        </div>
+      </div>
 
       <div className="mt-4 grid gap-2">
         {layerControls.map((control) => (

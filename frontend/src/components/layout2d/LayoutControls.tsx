@@ -11,9 +11,22 @@ export interface LayerState {
   labels: boolean;
 }
 
+export type LayoutViewMode =
+  | "overview"
+  | "production"
+  | "waterInjection"
+  | "gasInjection"
+  | "control"
+  | "risers"
+  | "currents"
+  | "future"
+  | "lengths";
+
 interface LayoutControlsProps {
   layers: LayerState;
+  viewMode: LayoutViewMode;
   onToggle: (key: keyof LayerState) => void;
+  onViewModeChange: (mode: LayoutViewMode) => void;
   onReset: () => void;
   onExport: () => void;
 }
@@ -29,9 +42,23 @@ const controls: Array<{ key: keyof LayerState; label: string }> = [
   { key: "labels", label: "Labels" },
 ];
 
+const viewModes: Array<{ value: LayoutViewMode; label: string }> = [
+  { value: "overview", label: "Visão geral" },
+  { value: "production", label: "Produção" },
+  { value: "waterInjection", label: "Injeção de água" },
+  { value: "gasInjection", label: "Injeção de gás" },
+  { value: "control", label: "Controle e umbilicais" },
+  { value: "risers", label: "Risers e conexão com FPSO" },
+  { value: "currents", label: "Correntes e interferências" },
+  { value: "future", label: "Expansão futura" },
+  { value: "lengths", label: "Comprimentos e distâncias" },
+];
+
 export function LayoutControls({
   layers,
+  viewMode,
   onToggle,
+  onViewModeChange,
   onReset,
   onExport,
 }: LayoutControlsProps) {
@@ -48,6 +75,23 @@ export function LayoutControls({
           <RotateCcw className="h-4 w-4" />
         </button>
       </div>
+
+      <label className="mt-4 block text-xs font-semibold uppercase text-slate-500">
+        Modo de visualização
+        <select
+          value={viewMode}
+          onChange={(event) =>
+            onViewModeChange(event.target.value as LayoutViewMode)
+          }
+          className="mt-2 min-h-10 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 text-sm font-medium text-slate-200 outline-none transition focus:border-cyan-400"
+        >
+          {viewModes.map((mode) => (
+            <option key={mode.value} value={mode.value}>
+              {mode.label}
+            </option>
+          ))}
+        </select>
+      </label>
 
       <div className="mt-4 grid gap-2">
         {controls.map((control) => (
@@ -77,4 +121,3 @@ export function LayoutControls({
     </section>
   );
 }
-

@@ -80,13 +80,15 @@ class Scenario(BaseModel):
     meteo_ocean: MeteoOceanData
 
 
-class CalculationResults(BaseModel):
+class CalculationSummary(BaseModel):
     total_oil_rate_stb_d: float
     total_water_rate_stb_d: float
     total_gas_rate_mmscf_d: float
+    total_liquid_rate_stb_d: float
     average_oil_rate_per_well_stb_d: float
     average_water_rate_per_well_stb_d: float
     average_gas_rate_per_well_mmscf_d: float
+    weighted_bsw_percent: float
     simple_average_bsw_percent: float
     fpso_oil_occupancy_percent: float
     fpso_gas_occupancy_percent: float
@@ -94,17 +96,40 @@ class CalculationResults(BaseModel):
     total_water_injection_rate_bwpd: float
     water_treatment_injection_occupancy_percent: float
     gas_available_for_reinjection_mmscf_d: float
+    water_injection_liquid_replacement_ratio_percent: float
     remaining_oil_capacity_stb_d: float
     remaining_gas_capacity_mmscf_d: float
     remaining_water_treatment_injection_capacity_stb_d: float
     interpretation: list[str]
 
 
+class CalculationStep(BaseModel):
+    indicator: str
+    formula: str
+    input_values: str
+    calculation_steps: list[str]
+    result: float | str
+    unit: str
+    interpretation: str
+
+
+class CalculationResponse(BaseModel):
+    summary: CalculationSummary
+    detailed_steps: list[CalculationStep]
+
+
 class EquipmentRecommendation(BaseModel):
+    id: str
     category: str
-    equipment: str
-    recommendation: str
+    name: str
+    quantity: int
+    type: str
+    installation_location: str
+    position_reference: str
+    function: str
+    connected_to: list[str]
     technical_justification: str
+    operational_notes: str
 
 
 class LayoutAsset(BaseModel):

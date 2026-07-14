@@ -9,6 +9,7 @@ interface LayoutAssetNodeProps {
   y: number;
   selected: boolean;
   showLabel: boolean;
+  opacity?: number;
   onSelect: (asset: LayoutAsset) => void;
 }
 
@@ -81,6 +82,7 @@ export function LayoutAssetNode({
   y,
   selected,
   showLabel,
+  opacity = 1,
   onSelect,
 }: LayoutAssetNodeProps) {
   const style = assetStyles[type];
@@ -103,6 +105,7 @@ export function LayoutAssetNode({
       data-layout-asset-id={asset.id}
       className="cursor-pointer outline-none"
       filter={selected ? "url(#selectedGlow)" : undefined}
+      opacity={selected ? 1 : opacity}
       onClick={(event) => {
         event.stopPropagation();
         onSelect(asset);

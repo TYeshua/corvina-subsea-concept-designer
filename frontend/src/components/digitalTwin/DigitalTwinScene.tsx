@@ -17,6 +17,10 @@ import {
   scaleDigitalTwinPosition,
   scaleSeabedY,
 } from "../../utils/digitalTwinScale";
+import {
+  getDigitalTwinCameraConfig,
+  type DigitalTwinViewMode,
+} from "../../utils/digitalTwinCamera";
 import { CameraRig } from "./CameraRig";
 import { CurrentVector } from "./CurrentVector";
 import {
@@ -25,15 +29,18 @@ import {
 } from "./DigitalTwinControls";
 import { DigitalTwinInfoPanel } from "./DigitalTwinInfoPanel";
 import { DigitalTwinLegend } from "./DigitalTwinLegend";
+import { DigitalTwinTechnicalPanel } from "./DigitalTwinTechnicalPanel";
 import { FlowlineModel } from "./FlowlineModel";
 import { FPSOModel } from "./FPSOModel";
 import { ManifoldModel } from "./ManifoldModel";
+import { ReservoirLayer } from "./ReservoirLayer";
 import { RiserModel } from "./RiserModel";
 import { SDUModel } from "./SDUModel";
 import { Seabed } from "./Seabed";
 import { SeaSurface } from "./SeaSurface";
 import { UmbilicalModel } from "./UmbilicalModel";
 import { WellModel } from "./WellModel";
+import { WellboreModel } from "./WellboreModel";
 
 interface DigitalTwinSceneProps {
   twin: DigitalTwinData;
@@ -53,11 +60,99 @@ const initialLayers: DigitalTwinLayerState = {
   risers: true,
   umbilicals: true,
   sdus: true,
+  reservoir: true,
+  wellbores: true,
   labels: true,
   seaSurface: true,
   seabed: true,
   current: true,
 };
+
+function layersForViewMode(mode: DigitalTwinViewMode): DigitalTwinLayerState {
+  const allLayers: DigitalTwinLayerState = { ...initialLayers };
+
+  if (mode === "overview" || mode === "top" || mode === "verticalSection") {
+    return allLayers;
+  }
+
+  if (mode === "production") {
+    return {
+      ...allLayers,
+      waterInjection: false,
+      gasInjection: false,
+      reservoir: false,
+      wellbores: false,
+      current: false,
+    };
+  }
+
+  if (mode === "waterInjection") {
+    return {
+      ...allLayers,
+      production: false,
+      gasInjection: false,
+      reservoir: false,
+      wellbores: false,
+      current: false,
+    };
+  }
+
+  if (mode === "gasInjection") {
+    return {
+      ...allLayers,
+      production: false,
+      waterInjection: false,
+      reservoir: false,
+      wellbores: false,
+      current: false,
+    };
+  }
+
+  if (mode === "risers") {
+    return {
+      ...allLayers,
+      production: false,
+      waterInjection: false,
+      gasInjection: false,
+      umbilicals: false,
+      sdus: false,
+      reservoir: false,
+      wellbores: false,
+      current: false,
+    };
+  }
+
+  if (mode === "umbilicals") {
+    return {
+      ...allLayers,
+      production: false,
+      waterInjection: false,
+      gasInjection: false,
+      risers: false,
+      reservoir: false,
+      wellbores: false,
+      current: false,
+    };
+  }
+
+  if (mode === "wellbores") {
+    return {
+      ...allLayers,
+      risers: false,
+      umbilicals: false,
+      sdus: false,
+      current: false,
+    };
+  }
+
+  return {
+    ...allLayers,
+    risers: false,
+    umbilicals: false,
+    sdus: false,
+    current: false,
+  };
+}
 
 function assetIsVisible(
   asset: DigitalTwinAsset,
@@ -191,6 +286,7 @@ export function DigitalTwinScene({ twin }: DigitalTwinSceneProps) {
   const [selectedItem, setSelectedItem] = useState<DigitalTwinSelectedItem>(null);
   const [captureStatus, setCaptureStatus] = useState<string>("");
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [viewMode, setViewMode] = useState<DigitalTwinViewMode>("overview");
 
   const visibleAssets = useMemo(
     () => twin.assets.filter((asset) => assetIsVisible(asset, layers)),
@@ -215,6 +311,10 @@ export function DigitalTwinScene({ twin }: DigitalTwinSceneProps) {
   const connectionRenderData = useMemo(
     () => buildConnectionRenderData(twin, visibleConnections),
     [twin, visibleConnections],
+  );
+  const cameraTarget = useMemo(
+    () => getDigitalTwinCameraConfig(viewMode).target,
+    [viewMode],
   );
 
   const seabedY = scaleSeabedY(twin.metadata.seabed_y);
@@ -245,6 +345,12 @@ export function DigitalTwinScene({ twin }: DigitalTwinSceneProps) {
 
   function toggleLayer(key: keyof DigitalTwinLayerState) {
     setLayers((current) => ({ ...current, [key]: !current[key] }));
+  }
+
+  function changeViewMode(mode: DigitalTwinViewMode) {
+    setViewMode(mode);
+    setLayers(layersForViewMode(mode));
+    setSelectedItem(null);
   }
 
   function captureScene() {
@@ -327,23 +433,42 @@ export function DigitalTwinScene({ twin }: DigitalTwinSceneProps) {
           />
           <pointLight position={[-5, 2, -4]} intensity={0.95} color="#38bdf8" />
           <pointLight position={[4, -2, 5]} intensity={0.55} color="#34d399" />
-          <CameraRig />
+          <CameraRig viewMode={viewMode} />
           <OrbitControls
             enablePan
             enableZoom
             enableRotate
             makeDefault
-            maxDistance={18}
-            minDistance={4.5}
-            target={[0, -2.6, 2.4]}
+            maxDistance={26}
+            minDistance={3.4}
+            target={cameraTarget}
           />
 
           <SeaSurface visible={layers.seaSurface} />
-          <Seabed y={seabedY} visible={layers.seabed} />
+          <Seabed
+            y={seabedY}
+            visible={layers.seabed}
+            transparent={layers.reservoir || layers.wellbores}
+          />
+          <ReservoirLayer
+            reservoirY={twin.metadata.reservoir_y}
+            label={twin.metadata.reservoir_label}
+            visible={layers.reservoir}
+          />
           <CurrentVector
             visible={layers.current}
             velocity={twin.metadata.water_depth_m > 0 ? 2.3 : 0}
           />
+
+          {layers.wellbores
+            ? twin.wellbores?.map((wellbore) => (
+                <WellboreModel
+                  key={wellbore.id}
+                  wellbore={wellbore}
+                  showLabel={layers.labels}
+                />
+              ))
+            : null}
 
           {connectionRenderData.map(({ id, connection, from, to }) => {
             const type = normalizeConnectionType(connection.type);
@@ -484,14 +609,20 @@ export function DigitalTwinScene({ twin }: DigitalTwinSceneProps) {
       <aside className={isFullscreen ? "max-h-[calc(100vh-2rem)] space-y-4 overflow-y-auto" : "space-y-4"}>
         <DigitalTwinControls
           layers={layers}
+          viewMode={viewMode}
           onToggle={toggleLayer}
-          onReset={() => setLayers(initialLayers)}
+          onViewModeChange={changeViewMode}
+          onReset={() => {
+            setViewMode("overview");
+            setLayers(initialLayers);
+          }}
           onCapture={captureScene}
           onToggleFullscreen={toggleFullscreen}
           isFullscreen={isFullscreen}
           captureStatus={captureStatus}
         />
         <DigitalTwinInfoPanel twin={twin} selectedItem={selectedItem} />
+        <DigitalTwinTechnicalPanel twin={twin} />
         <DigitalTwinLegend />
       </aside>
     </div>

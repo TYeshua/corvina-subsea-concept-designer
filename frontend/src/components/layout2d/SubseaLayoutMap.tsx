@@ -12,7 +12,11 @@ import {
 import { CurrentArrow } from "./CurrentArrow";
 import { LayoutAssetNode } from "./LayoutAssetNode";
 import { LayoutConnectionLine } from "./LayoutConnectionLine";
-import { LayoutControls, type LayerState } from "./LayoutControls";
+import {
+  LayoutControls,
+  type LayerState,
+  type LayoutViewMode,
+} from "./LayoutControls";
 import { LayoutInfoPanel } from "./LayoutInfoPanel";
 import { LayoutLegend } from "./LayoutLegend";
 import { NorthArrow } from "./NorthArrow";
@@ -150,6 +154,91 @@ function resolveFlowPoints(
   return { from: defaultFrom, to: defaultTo };
 }
 
+function distanceKm(from: LayoutAsset, to: LayoutAsset): number {
+  const dx = getAssetX(to) - getAssetX(from);
+  const dy = getAssetY(to) - getAssetY(from);
+  return Math.sqrt(dx * dx + dy * dy);
+}
+
+function assetOpacityForMode(
+  asset: LayoutAsset,
+  type: ReturnType<typeof normalizeAssetType>,
+  mode: LayoutViewMode,
+): number {
+  if (mode === "overview" || mode === "future" || mode === "lengths") {
+    return 1;
+  }
+
+  if (mode === "production") {
+    return type === "fpso" ||
+      type === "producer_well" ||
+      type === "production_manifold"
+      ? 1
+      : 0.18;
+  }
+
+  if (mode === "waterInjection") {
+    return ["FPSO", "MI-WATER", "I-01", "I-03"].includes(asset.id) ? 1 : 0.18;
+  }
+
+  if (mode === "gasInjection") {
+    return ["FPSO", "PLET-GAS", "I-02"].includes(asset.id) ? 1 : 0.18;
+  }
+
+  if (mode === "control") {
+    return type === "fpso" || type === "sdu" ? 1 : 0.24;
+  }
+
+  if (mode === "risers") {
+    return ["FPSO", "MP-01", "MP-02", "MI-WATER", "PLET-GAS"].includes(asset.id)
+      ? 1
+      : 0.22;
+  }
+
+  if (mode === "currents") {
+    return 0.72;
+  }
+
+  return 1;
+}
+
+function connectionOpacityForMode(
+  type: ReturnType<typeof normalizeConnectionType>,
+  mode: LayoutViewMode,
+): number {
+  if (mode === "overview" || mode === "future" || mode === "lengths") {
+    return 0.9;
+  }
+
+  if (mode === "production") {
+    return type === "production_flowline" || type === "jumper" || type === "riser"
+      ? 1
+      : 0.14;
+  }
+
+  if (mode === "waterInjection") {
+    return type === "water_injection_flowline" ? 1 : 0.14;
+  }
+
+  if (mode === "gasInjection") {
+    return type === "gas_injection_flowline" ? 1 : 0.14;
+  }
+
+  if (mode === "control") {
+    return type === "umbilical" || type === "control_link" ? 1 : 0.12;
+  }
+
+  if (mode === "risers") {
+    return type === "riser" ? 1 : 0.16;
+  }
+
+  if (mode === "currents") {
+    return 0.45;
+  }
+
+  return 0.9;
+}
+
 export function SubseaLayoutMap({ layout }: SubseaLayoutMapProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const svgRef = useRef<SVGSVGElement | null>(null);
@@ -162,6 +251,7 @@ export function SubseaLayoutMap({ layout }: SubseaLayoutMapProps) {
   );
   const [zoom, setZoom] = useState(1);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [viewMode, setViewMode] = useState<LayoutViewMode>("overview");
 
   const fieldWidthKm = layout.metadata.field_width_km;
   const fieldHeightKm = layout.metadata.field_height_km;
@@ -225,6 +315,49 @@ export function SubseaLayoutMap({ layout }: SubseaLayoutMapProps) {
     [layers, layout.connections, visibleAssetIds],
   );
 
+  const distanceSummary = useMemo(() => {
+    const assetById = new Map(layout.assets.map((asset) => [asset.id, asset]));
+    const distances = layout.connections
+      .map((connection) => {
+        const from = assetById.get(connection.from);
+        const to = assetById.get(connection.to);
+
+        if (!from || !to) {
+          return null;
+        }
+
+        const type = normalizeConnectionType(connection.type);
+        return {
+          id: `${connection.from}-${connection.to}-${connection.type}`,
+          from: connection.from,
+          to: connection.to,
+          type,
+          distance: distanceKm(from, to),
+        };
+      })
+      .filter(Boolean) as Array<{
+      id: string;
+      from: string;
+      to: string;
+      type: ReturnType<typeof normalizeConnectionType>;
+      distance: number;
+    }>;
+
+    const sumByType = (types: Array<ReturnType<typeof normalizeConnectionType>>) =>
+      distances
+        .filter((item) => types.includes(item.type))
+        .reduce((total, item) => total + item.distance, 0);
+
+    return {
+      distances,
+      productionFlowlinesKm: sumByType(["production_flowline", "riser"]),
+      waterFlowlinesKm: sumByType(["water_injection_flowline"]),
+      gasFlowlinesKm: sumByType(["gas_injection_flowline"]),
+      umbilicalsKm: sumByType(["umbilical", "control_link"]),
+      jumpersKm: sumByType(["jumper"]),
+    };
+  }, [layout.assets, layout.connections]);
+
   function toggleLayer(key: keyof LayerState) {
     setLayers((current) => ({ ...current, [key]: !current[key] }));
   }
@@ -262,21 +395,43 @@ export function SubseaLayoutMap({ layout }: SubseaLayoutMapProps) {
     }
 
     const clone = svgRef.current.cloneNode(true) as SVGSVGElement;
+    const exportWidth = 1600;
+    const exportHeight = 1216;
+
     clone.setAttribute("xmlns", "http://www.w3.org/2000/svg");
-    clone.setAttribute("width", "1600");
-    clone.setAttribute("height", "1216");
+    clone.setAttribute("width", String(exportWidth));
+    clone.setAttribute("height", String(exportHeight));
+    clone.setAttribute("viewBox", `0 0 ${viewBoxWidth} ${viewBoxHeight}`);
+    clone.setAttribute("preserveAspectRatio", "xMidYMid meet");
+    clone.setAttribute("shape-rendering", "geometricPrecision");
     clone.setAttribute("style", "background:#020617;font-family:Inter,Arial,sans-serif");
+    clone.removeAttribute("class");
+    clone.removeAttribute("role");
+    clone.removeAttribute("aria-label");
     clone.querySelector("[data-layout-zoom-group]")?.setAttribute("transform", "");
 
     const style = document.createElementNS("http://www.w3.org/2000/svg", "style");
     style.textContent = `
       svg { background: #020617; }
-      text { font-family: Inter, Arial, sans-serif; }
+      text {
+        font-family: Inter, Arial, sans-serif;
+        paint-order: stroke;
+        stroke-linejoin: round;
+      }
       [role="button"] { cursor: default; }
     `;
     clone.insertBefore(style, clone.firstChild);
 
-    const source = new XMLSerializer().serializeToString(clone);
+    clone.querySelectorAll("[class]").forEach((node) => node.removeAttribute("class"));
+    clone.querySelectorAll("text").forEach((node) => {
+      node.setAttribute("font-family", "Inter, Arial, sans-serif");
+      if (!node.getAttribute("fill")) {
+        node.setAttribute("fill", "#e2e8f0");
+      }
+    });
+    clone.querySelectorAll("[tabindex]").forEach((node) => node.removeAttribute("tabindex"));
+
+    const source = `<?xml version="1.0" encoding="UTF-8"?>\n${new XMLSerializer().serializeToString(clone)}`;
     const blob = new Blob([source], { type: "image/svg+xml;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
@@ -496,6 +651,87 @@ export function SubseaLayoutMap({ layout }: SubseaLayoutMapProps) {
                 Eixo Leste-Oeste (km)
               </text>
 
+              {viewMode === "future" ? (
+                <g>
+                  <rect
+                    x={mapX + scaleX(0.7, mapWidth, fieldWidthKm)}
+                    y={mapY + scaleY(7.6, mapHeight, displayHeightKm)}
+                    width={scaleX(1.7, mapWidth, fieldWidthKm)}
+                    height={scaleY(0, mapHeight, displayHeightKm) - scaleY(1.5, mapHeight, displayHeightKm)}
+                    fill="#0f766e"
+                    fillOpacity={0.12}
+                    stroke="#2dd4bf"
+                    strokeDasharray="8 6"
+                    strokeWidth={2}
+                  />
+                  <text
+                    x={mapX + scaleX(1.55, mapWidth, fieldWidthKm)}
+                    y={mapY + scaleY(7.3, mapHeight, displayHeightKm)}
+                    textAnchor="middle"
+                    fill="#99f6e4"
+                    fontSize={12}
+                    fontWeight={700}
+                  >
+                    Zona de expansão futura oeste
+                  </text>
+                  <rect
+                    x={mapX + scaleX(7.7, mapWidth, fieldWidthKm)}
+                    y={mapY + scaleY(7.6, mapHeight, displayHeightKm)}
+                    width={scaleX(1.7, mapWidth, fieldWidthKm)}
+                    height={scaleY(0, mapHeight, displayHeightKm) - scaleY(1.5, mapHeight, displayHeightKm)}
+                    fill="#1d4ed8"
+                    fillOpacity={0.1}
+                    stroke="#60a5fa"
+                    strokeDasharray="8 6"
+                    strokeWidth={2}
+                  />
+                  <text
+                    x={mapX + scaleX(8.55, mapWidth, fieldWidthKm)}
+                    y={mapY + scaleY(7.3, mapHeight, displayHeightKm)}
+                    textAnchor="middle"
+                    fill="#bfdbfe"
+                    fontSize={12}
+                    fontWeight={700}
+                  >
+                    Zona de expansão futura leste
+                  </text>
+                </g>
+              ) : null}
+
+              {viewMode === "currents" ? (
+                <g>
+                  <rect
+                    x={mapX + mapWidth - 270}
+                    y={fieldTop + 132}
+                    width={245}
+                    height={92}
+                    rx={10}
+                    fill="#020617"
+                    fillOpacity={0.86}
+                    stroke="#38bdf8"
+                    strokeOpacity={0.35}
+                  />
+                  <text
+                    x={mapX + mapWidth - 252}
+                    y={fieldTop + 158}
+                    fill="#e0f2fe"
+                    fontSize={12}
+                    fontWeight={700}
+                  >
+                    Corrente NE → SW
+                  </text>
+                  <text x={mapX + mapWidth - 252} y={fieldTop + 180} fill="#bae6fd" fontSize={11}>
+                    Velocidade média: 1,2 m/s
+                  </text>
+                  <text x={mapX + mapWidth - 252} y={fieldTop + 199} fill="#bae6fd" fontSize={11}>
+                    Velocidade de projeto: 2,3 m/s
+                  </text>
+                  <text x={mapX + mapWidth - 252} y={fieldTop + 218} fill="#94a3b8" fontSize={10}>
+                    Impacta risers, umbilicais e instalação.
+                  </text>
+                </g>
+              ) : null}
+
               {visibleConnections.map(({ connection, id, originalIndex }) => {
                 const { from, to } = resolveFlowPoints(connection, assetPositions);
 
@@ -504,23 +740,47 @@ export function SubseaLayoutMap({ layout }: SubseaLayoutMapProps) {
                 }
 
                 const type = normalizeConnectionType(connection.type);
+                const distance = distanceSummary.distances.find(
+                  (item) =>
+                    item.from === connection.from &&
+                    item.to === connection.to &&
+                    item.type === type,
+                )?.distance;
+                const labelX = (from.x + to.x) / 2;
+                const labelY = (from.y + to.y) / 2;
 
                 return (
-                  <LayoutConnectionLine
-                    key={id}
-                    id={id}
-                    connection={connection}
-                    type={type}
-                    from={from}
-                    to={to}
-                    selected={selectedConnectionId === id}
-                    index={originalIndex}
-                    onSelect={(selected, selectedId) => {
-                      setSelectedConnection(selected);
-                      setSelectedConnectionId(selectedId);
-                      setSelectedAsset(null);
-                    }}
-                  />
+                  <g key={id}>
+                    <LayoutConnectionLine
+                      id={id}
+                      connection={connection}
+                      type={type}
+                      from={from}
+                      to={to}
+                      selected={selectedConnectionId === id}
+                      index={originalIndex}
+                      opacity={connectionOpacityForMode(type, viewMode)}
+                      onSelect={(selected, selectedId) => {
+                        setSelectedConnection(selected);
+                        setSelectedConnectionId(selectedId);
+                        setSelectedAsset(null);
+                      }}
+                    />
+                    {viewMode === "lengths" && distance ? (
+                      <text
+                        x={labelX}
+                        y={labelY - 8}
+                        textAnchor="middle"
+                        fill="#e0f2fe"
+                        fontSize={10}
+                        paintOrder="stroke"
+                        stroke="#020617"
+                        strokeWidth={3}
+                      >
+                        {`${distance.toFixed(1)} km`}
+                      </text>
+                    ) : null}
+                  </g>
                 );
               })}
 
@@ -537,6 +797,7 @@ export function SubseaLayoutMap({ layout }: SubseaLayoutMapProps) {
                     y={position.y}
                     selected={selectedAsset?.id === asset.id}
                     showLabel={layers.labels}
+                    opacity={assetOpacityForMode(asset, type, viewMode)}
                     onSelect={(selected) => {
                       setSelectedAsset(selected);
                       setSelectedConnection(null);
@@ -566,10 +827,53 @@ export function SubseaLayoutMap({ layout }: SubseaLayoutMapProps) {
       <aside className="space-y-4">
         <LayoutControls
           layers={layers}
+          viewMode={viewMode}
           onToggle={toggleLayer}
+          onViewModeChange={setViewMode}
           onReset={() => setLayers(initialLayers)}
           onExport={exportSvg}
         />
+        <section className="rounded-lg border border-cyan-500/20 bg-slate-900/80 p-4 shadow-panel">
+          <h2 className="text-sm font-semibold text-white">
+            Estimativas conceituais
+          </h2>
+          <p className="mt-2 text-xs leading-5 text-slate-400">
+            Distâncias euclidianas em km para leitura conceitual. Não representam
+            cálculo executivo de rota ou instalação.
+          </p>
+          <dl className="mt-4 space-y-2 text-sm">
+            <div className="flex justify-between gap-3">
+              <dt className="text-slate-400">Produção + risers</dt>
+              <dd className="font-semibold text-cyan-100">
+                {distanceSummary.productionFlowlinesKm.toFixed(1)} km
+              </dd>
+            </div>
+            <div className="flex justify-between gap-3">
+              <dt className="text-slate-400">Injeção de água</dt>
+              <dd className="font-semibold text-cyan-100">
+                {distanceSummary.waterFlowlinesKm.toFixed(1)} km
+              </dd>
+            </div>
+            <div className="flex justify-between gap-3">
+              <dt className="text-slate-400">Injeção de gás</dt>
+              <dd className="font-semibold text-cyan-100">
+                {distanceSummary.gasFlowlinesKm.toFixed(1)} km
+              </dd>
+            </div>
+            <div className="flex justify-between gap-3">
+              <dt className="text-slate-400">Umbilicais/controle</dt>
+              <dd className="font-semibold text-cyan-100">
+                {distanceSummary.umbilicalsKm.toFixed(1)} km
+              </dd>
+            </div>
+            <div className="flex justify-between gap-3">
+              <dt className="text-slate-400">Jumpers</dt>
+              <dd className="font-semibold text-cyan-100">
+                {distanceSummary.jumpersKm.toFixed(1)} km
+              </dd>
+            </div>
+          </dl>
+        </section>
         <LayoutInfoPanel
           layout={layout}
           selectedAsset={selectedAsset}

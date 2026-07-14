@@ -4,9 +4,10 @@ import { FIELD_HEIGHT_KM, FIELD_WIDTH_KM, HORIZONTAL_SCALE } from "../../utils/d
 interface SeabedProps {
   y: number;
   visible: boolean;
+  transparent?: boolean;
 }
 
-export function Seabed({ y, visible }: SeabedProps) {
+export function Seabed({ y, visible, transparent = false }: SeabedProps) {
   if (!visible) {
     return null;
   }
@@ -18,7 +19,14 @@ export function Seabed({ y, visible }: SeabedProps) {
     <group>
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, y, 0]}>
         <planeGeometry args={[width, depth, 18, 18]} />
-        <meshStandardMaterial color="#142033" roughness={0.94} metalness={0.02} />
+        <meshStandardMaterial
+          color="#142033"
+          roughness={0.94}
+          metalness={0.02}
+          transparent={transparent}
+          opacity={transparent ? 0.48 : 1}
+          depthWrite={!transparent}
+        />
       </mesh>
       <gridHelper
         args={[Math.max(width, depth), 10, "#2f5269", "#1f3348"]}

@@ -7,108 +7,155 @@ from .equipment import get_equipment_recommendations
 
 def generate_report_text() -> dict[str, object]:
     """Generate a structured Portuguese technical base text for the report."""
-    calculations = calculate_field_indicators()
-    recommendations = get_equipment_recommendations()
+    calculation_response = calculate_field_indicators()
+    calculations = calculation_response.summary
+    detailed_steps = calculation_response.detailed_steps
+    equipment = get_equipment_recommendations()
+
+    calculation_text = "\n".join(
+        (
+            f"{index}. {step.indicator}\n"
+            f"Formula: {step.formula}\n"
+            f"Valores de entrada: {step.input_values}\n"
+            f"Memoria: {' | '.join(step.calculation_steps)}\n"
+            f"Resultado: {step.result} {step.unit}\n"
+            f"Interpretacao: {step.interpretation}"
+        )
+        for index, step in enumerate(detailed_steps, start=1)
+    )
+
+    equipment_text = "\n".join(
+        (
+            f"- {item.name}: quantidade {item.quantity}; tipo {item.type}; "
+            f"local: {item.installation_location}; conexoes: {', '.join(item.connected_to)}; "
+            f"justificativa: {item.technical_justification}"
+        )
+        for item in equipment
+    )
 
     sections = [
         {
-            "title": "1. Introdução",
+            "title": "1. Introducao",
             "text": (
-                "O presente projeto propõe o desenvolvimento conceitual do sistema submarino de produção "
-                f"do Campo {SCENARIO.field.name}, localizado no Bloco {SCENARIO.field.block}, na Bacia "
-                f"da {SCENARIO.field.basin}. Como complemento ao relatório tradicional, foi desenvolvida "
-                "uma ferramenta web denominada Corvina Subsea Concept Designer, voltada à integração dos "
-                "dados do campo, cálculos de engenharia, seleção de equipamentos, geração de layout em "
-                "planta e representação em gêmeo digital conceitual."
+                "O presente relatorio consolida o desenvolvimento conceitual do sistema submarino "
+                f"de producao do Campo {SCENARIO.field.name}, no Bloco {SCENARIO.field.block}, "
+                f"Bacia da {SCENARIO.field.basin}. A ferramenta Corvina Subsea Concept Designer "
+                "organiza dados do campo, calculos de engenharia, inventario de equipamentos, "
+                "layout 2D, gemeo digital conceitual 3D e relatorio tecnico automatico."
             ),
         },
         {
-            "title": "2. Caracterização do Campo Corvina",
+            "title": "2. Fundamentacao teorica",
             "text": (
-                f"O Campo {SCENARIO.field.name} apresenta lâmina d'água de aproximadamente "
-                f"{SCENARIO.field.water_depth_m:.0f} m, reservatório a cerca de "
-                f"{SCENARIO.field.reservoir_depth_m:.0f} m de profundidade e sistema de desenvolvimento "
-                f"composto por {SCENARIO.field.total_wells} poços submarinos. O plano conceitual considera "
-                f"{SCENARIO.field.producer_wells} poços produtores, dois poços injetores de água e um poço "
-                "injetor de gás, todos conectados a uma FPSO. As condições meteo-oceanográficas indicam "
-                f"correntes intensas, com velocidade máxima de projeto de "
-                f"{SCENARIO.meteo_ocean.design_current_velocity_m_s:.1f} m/s, fator relevante para o arranjo "
-                "de risers, flowlines e umbilicais."
+                "Sistemas submarinos de producao em aguas profundas integram arvores submarinas, "
+                "jumpers, manifolds, PLETs, flowlines, risers, umbilicais, SDUs, sensores e "
+                "sistemas de controle. A concepcao deve considerar garantia de escoamento, "
+                "integridade, instalacao, manutencao, correntes, profundidade, estrategia de "
+                "injecao e capacidade da unidade de producao."
             ),
         },
         {
-            "title": "3. Síntese dos Cálculos",
+            "title": "3. Caracterizacao do Campo Corvina",
             "text": (
-                f"A produção total de óleo do campo é de {calculations.total_oil_rate_stb_d:.0f} STB/d, "
-                f"correspondente a aproximadamente {calculations.fpso_oil_occupancy_percent:.1f}% da "
-                "capacidade de processamento de óleo da FPSO. A produção total de gás é de "
-                f"{calculations.total_gas_rate_mmscf_d:.0f} MMSCF/d, equivalente a "
-                f"{calculations.fpso_gas_occupancy_percent:.1f}% da capacidade de processamento de gás da "
-                f"unidade. A produção total de água é de {calculations.total_water_rate_stb_d:.0f} STB/d, "
-                "ainda baixa em relação à capacidade de tratamento e injeção de água da FPSO. Considerando "
-                f"o consumo operacional de gás de {SCENARIO.fpso.gas_consumption_mmscf_d:.0f} MMSCF/d, o "
-                f"volume conceitualmente disponível para reinjeção é de "
-                f"{calculations.gas_available_for_reinjection_mmscf_d:.0f} MMSCF/d."
+                f"O Campo {SCENARIO.field.name} possui lamina d'agua de aproximadamente "
+                f"{SCENARIO.field.water_depth_m:.0f} m e reservatorio a cerca de "
+                f"{SCENARIO.field.reservoir_depth_m:.0f} m de profundidade. A lamina d'agua "
+                "corresponde a distancia entre a superficie do mar e o leito marinho, onde "
+                "ficam instalados os equipamentos submarinos. O reservatorio e representado "
+                "como camada inferior no gemeo digital conceitual."
             ),
         },
         {
-            "title": "4. Arquitetura Submarina Recomendada",
+            "title": "4. Dados de entrada",
             "text": (
-                "A arquitetura proposta utiliza uma configuração por clusters, com dois manifolds de produção, "
-                "um manifold dedicado à injeção de água e um PLET ou manifold simplificado para injeção de gás. "
-                "Os produtores P-01, P-02 e P-03 são conectados ao MP-01, enquanto P-04 e P-05 são conectados "
-                "ao MP-02. Os injetores de água I-01 e I-03 são conectados ao MI-WATER, enquanto o injetor "
-                "de gás I-02 é conectado ao PLET-GAS."
+                f"O cenario considera {SCENARIO.field.producer_wells} produtores, "
+                f"{SCENARIO.field.injector_wells} injetores, FPSO com capacidade de "
+                f"{SCENARIO.fpso.max_oil_processing_stb_d:.0f} STB/d de oleo, "
+                f"{SCENARIO.fpso.max_gas_processing_mmscf_d:.0f} MMSCF/d de gas e "
+                f"{SCENARIO.fpso.max_water_treatment_injection_stb_d:.0f} STB/d de "
+                "tratamento/injecao de agua. O oleo e parafinico, com risco conceitual "
+                "de deposicao de parafina em baixa temperatura."
             ),
         },
         {
-            "title": "5. Layout em Planta",
+            "title": "5. Desenvolvimento detalhado dos calculos",
+            "text": calculation_text,
+        },
+        {
+            "title": "6. Resultados calculados",
             "text": (
-                "O layout em planta organiza os equipamentos submarinos buscando reduzir cruzamentos, diminuir "
-                "comprimentos de jumpers, facilitar intervenções e manter espaço para expansão futura. A FPSO "
-                "é posicionada ao norte da área de desenvolvimento, permitindo um corredor organizado de risers "
-                "e umbilicais. A direção predominante da corrente, de Nordeste para Sudoeste, é representada "
-                "no layout para apoiar a interpretação do arranjo."
+                f"A producao total de oleo e {calculations.total_oil_rate_stb_d:.0f} STB/d, "
+                f"a producao de agua e {calculations.total_water_rate_stb_d:.0f} STB/d, "
+                f"a producao de gas e {calculations.total_gas_rate_mmscf_d:.0f} MMSCF/d "
+                f"e a producao total de liquidos e {calculations.total_liquid_rate_stb_d:.0f} STB/d. "
+                f"O BSW ponderado do campo e {calculations.weighted_bsw_percent:.2f}%, enquanto "
+                f"o BSW medio simples e {calculations.simple_average_bsw_percent:.1f}%. "
+                f"A injecao de agua representa {calculations.water_injection_liquid_replacement_ratio_percent:.2f}% "
+                "da producao total de liquidos, portanto nao deve ser interpretada como reposicao "
+                "integral isolada."
             ),
         },
         {
-            "title": "6. Gêmeo Digital Conceitual",
+            "title": "7. Inventario de equipamentos submarinos",
+            "text": equipment_text,
+        },
+        {
+            "title": "8. Projeto conceitual do sistema submarino",
             "text": (
-                "O gêmeo digital conceitual representa o sistema submarino em ambiente tridimensional interativo. "
-                "A cena 3D inclui a FPSO na superfície, o leito marinho, os poços, manifolds, flowlines, risers, "
-                "umbilicais, SDUs e o vetor de corrente predominante. Cada componente possui dados técnicos "
-                "associados, permitindo inspeção visual e informacional da arquitetura proposta. A escala vertical "
-                "é comprimida para fins de visualização e não representa proporções físicas reais."
+                "A arquitetura proposta utiliza dois manifolds de producao para organizar os "
+                "produtores em clusters, um manifold de injecao de agua para I-01 e I-03, um "
+                "PLET/manifold de gas para I-02, tres SDUs, flowlines rigidas, jumpers, risers "
+                "adequados a aguas ultraprofundas e umbilicais eletro-hidraulicos multiplexados."
             ),
         },
         {
-            "title": "7. Discussão Técnica",
+            "title": "9. Layout em planta",
             "text": (
-                "A lâmina d'água ultraprofundas influencia diretamente a seleção dos risers, o sistema de controle, "
-                "a instalação dos equipamentos e a confiabilidade do arranjo submarino. As correntes intensas "
-                "aumentam a importância da análise de esforços, estabilidade das linhas e comportamento dinâmico "
-                "dos risers. O óleo parafínico exige atenção à garantia de escoamento, justificando o uso de "
-                "flowlines de produção com isolamento térmico e previsão de injeção química via umbilicais."
+                "O layout 2D apresenta a distribuicao conceitual dos ativos no campo, com modos "
+                "de visualizacao para producao, injecao de agua, injecao de gas, controle, risers, "
+                "correntes, expansao futura e estimativas conceituais de comprimentos."
             ),
         },
         {
-            "title": "8. Limitações do Protótipo",
+            "title": "10. Gemeo digital conceitual",
             "text": (
-                "O protótipo desenvolvido possui finalidade acadêmica e conceitual. Ele não realiza simulação "
-                "hidráulica multifásica, cálculo estrutural de risers, análise de fadiga, deposição de parafina, "
-                "formação de hidratos ou conexão com sensores reais. Apesar disso, a ferramenta organiza os dados "
-                "do projeto, automatiza os cálculos principais, melhora a visualização da arquitetura submarina e "
-                "fortalece a comunicação técnica do trabalho."
+                "O gemeo digital conceitual representa a FPSO na superficie, o leito marinho em "
+                "2.300 m, a camada de reservatorio em 5.600 m, equipamentos submarinos, linhas, "
+                "risers, umbilicais e trajetorias conceituais dos pocos. A escala vertical foi "
+                "comprimida para visualizacao e nao representa proporcoes fisicas reais."
             ),
         },
         {
-            "title": "9. Conclusão",
+            "title": "11. Discussao tecnica",
             "text": (
-                "O Corvina Subsea Concept Designer demonstra como conceitos de Engenharia de Petróleo podem ser "
-                "integrados a tecnologias modernas de Engenharia de Software. A ferramenta amplia a abordagem "
-                "tradicional do trabalho ao oferecer uma plataforma interativa para cálculo, seleção de equipamentos, "
-                "visualização em planta e gêmeo digital conceitual. Dessa forma, o projeto contribui para uma "
-                "apresentação mais clara, técnica e inovadora do sistema submarino proposto para o Campo Corvina."
+                "Os principais riscos conceituais sao oleo parafinico, lamina d'agua elevada, "
+                "correntes intensas, ausencia de exportacao de gas e alta ocupacao da FPSO em oleo. "
+                "A combinacao de injecao de agua e reinjecao de gas e coerente para manutencao "
+                "de pressao em nivel conceitual, embora a avaliacao final exija estudo de reservatorio."
+            ),
+        },
+        {
+            "title": "12. Limitacoes",
+            "text": (
+                "O prototipo possui finalidade academica. Ele nao realiza simulacao hidraulica "
+                "multifasica, analise estrutural de risers, fadiga, garantia de escoamento detalhada, "
+                "analise economica, sensores reais ou operacao em tempo real."
+            ),
+        },
+        {
+            "title": "13. Conclusao",
+            "text": (
+                "O Corvina Subsea Concept Designer melhora a comunicacao do projeto conceitual ao "
+                "integrar dados, calculos, equipamentos, visualizacoes e relatorio tecnico em uma "
+                "interface unica, mantendo coerencia com as premissas de aguas profundas do Campo Corvina."
+            ),
+        },
+        {
+            "title": "14. Referencias sugeridas",
+            "text": (
+                "Sugere-se consultar literatura de engenharia submarina, normas e praticas de projeto "
+                "para arvores submarinas, manifolds, risers, flowlines, garantia de escoamento, "
+                "sistemas de controle submarino e desenvolvimento de campos offshore em aguas profundas."
             ),
         },
     ]
@@ -118,8 +165,11 @@ def generate_report_text() -> dict[str, object]:
     )
 
     return {
-        "title": "Texto-base para relatório técnico do Campo Corvina",
+        "title": "Relatorio tecnico do Campo Corvina",
         "sections": sections,
-        "equipment_recommendations_count": len(recommendations),
+        "equipment_recommendations_count": len(equipment),
+        "calculation_steps_count": len(detailed_steps),
+        "calculation_memory": calculation_text,
+        "equipment_inventory_text": equipment_text,
         "full_text": full_text,
     }

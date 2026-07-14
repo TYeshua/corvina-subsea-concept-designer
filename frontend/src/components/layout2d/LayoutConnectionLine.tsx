@@ -14,6 +14,7 @@ interface LayoutConnectionLineProps {
   to: Point;
   selected: boolean;
   index: number;
+  opacity?: number;
   onSelect: (connection: LayoutConnection, id: string) => void;
 }
 
@@ -108,6 +109,7 @@ export function LayoutConnectionLine({
   to,
   selected,
   index,
+  opacity = 0.9,
   onSelect,
 }: LayoutConnectionLineProps) {
   const style = connectionStyles[type];
@@ -145,7 +147,7 @@ export function LayoutConnectionLine({
         strokeDasharray={style.dash}
         markerEnd={`url(#${style.marker})`}
         filter={selected ? "url(#selectedGlow)" : undefined}
-        opacity={selected ? 1 : 0.9}
+        opacity={selected ? 1 : opacity}
         pointerEvents="none"
       />
     </g>
